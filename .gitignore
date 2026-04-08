@@ -5,3 +5,4 @@ dist/
 .vinxi/
 pgdata/
 *.local
+.playwright-mcp

@@ -14,6 +14,7 @@ interface SearchHit {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  collectionId: string;
   savedAt: string;
   score: number;
   matchType: "vector" | "fts" | "both";
@@ -29,6 +30,10 @@ export async function handleSearch(c: Context) {
     return c.json({ results: [] });
   }
 
+  const collectionsParam = c.req.query("collections");
+  const collectionIds = collectionsParam ? collectionsParam.split(",").filter(Boolean) : [];
+  const hasCollectionFilter = collectionIds.length > 0;
+
   // Embed the query
   const embRes = await openai.embeddings.create({
     model: EMBED_MODEL,
@@ -36,31 +41,48 @@ export async function handleSearch(c: Context) {
   });
   const queryVec = JSON.stringify(embRes.data[0].embedding);
 
+  type Row = { id: string; text: string; doc_id: string; url: string; title: string | null; summary: string | null; doi: string | null; collection_id: string; captured_at: Date };
+
   // Vector search
-  const vectorRows = await sql<
-    { id: string; text: string; doc_id: string; url: string; title: string | null; summary: string | null; doi: string | null; captured_at: Date }[]
-  >`
-    SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.captured_at
-    FROM chunks c
-    JOIN documents d ON d.id = c.document_id
-    ORDER BY c.embedding <=> ${queryVec}::vector
-    LIMIT ${TOP_K}
-  `;
+  const vectorRows = hasCollectionFilter
+    ? await sql<Row[]>`
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        FROM chunks c
+        JOIN documents d ON d.id = c.document_id
+        WHERE d.collection_id = ANY(${sql.array(collectionIds)}::uuid[])
+        ORDER BY c.embedding <=> ${queryVec}::vector
+        LIMIT ${TOP_K}
+      `
+    : await sql<Row[]>`
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        FROM chunks c
+        JOIN documents d ON d.id = c.document_id
+        ORDER BY c.embedding <=> ${queryVec}::vector
+        LIMIT ${TOP_K}
+      `;
 
   // FTS search
-  const ftsRows = await sql<
-    { id: string; text: string; doc_id: string; url: string; title: string | null; summary: string | null; doi: string | null; captured_at: Date }[]
-  >`
-    SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.captured_at
-    FROM chunks c
-    JOIN documents d ON d.id = c.document_id
-    WHERE c.tsv @@ websearch_to_tsquery('english', ${q})
-    ORDER BY ts_rank(c.tsv, websearch_to_tsquery('english', ${q})) DESC
-    LIMIT ${TOP_K}
-  `;
+  const ftsRows = hasCollectionFilter
+    ? await sql<Row[]>`
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        FROM chunks c
+        JOIN documents d ON d.id = c.document_id
+        WHERE c.tsv @@ websearch_to_tsquery('english', ${q})
+          AND d.collection_id = ANY(${sql.array(collectionIds)}::uuid[])
+        ORDER BY ts_rank(c.tsv, websearch_to_tsquery('english', ${q})) DESC
+        LIMIT ${TOP_K}
+      `
+    : await sql<Row[]>`
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        FROM chunks c
+        JOIN documents d ON d.id = c.document_id
+        WHERE c.tsv @@ websearch_to_tsquery('english', ${q})
+        ORDER BY ts_rank(c.tsv, websearch_to_tsquery('english', ${q})) DESC
+        LIMIT ${TOP_K}
+      `;
 
   // Reciprocal Rank Fusion
-  const scores = new Map<string, { score: number; row: (typeof vectorRows)[0]; matchType: "vector" | "fts" | "both" }>();
+  const scores = new Map<string, { score: number; row: Row; matchType: "vector" | "fts" | "both" }>();
 
   vectorRows.forEach((row, i) => {
     scores.set(row.id, { score: rrfScore(i + 1), row, matchType: "vector" });
@@ -87,6 +109,7 @@ export async function handleSearch(c: Context) {
       documentTitle: row.title,
       summary: row.summary,
       doi: row.doi,
+      collectionId: row.collection_id,
       savedAt: row.captured_at.toISOString(),
       score: Math.round(score * 10000) / 10000,
       matchType,

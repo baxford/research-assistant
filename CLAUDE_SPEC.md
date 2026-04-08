@@ -2,7 +2,7 @@
 
 ## Overview
 
-A personal, local-only research assistant. A Chrome extension captures web pages and posts them to a backend API, which chunks and indexes the content in PostgreSQL (pgvector + full-text search). A minimal TanStack Start UI provides hybrid search over everything saved.
+A personal, local-only research assistant. A Chrome extension captures web pages and posts them to a backend API, which chunks and indexes the content in PostgreSQL (pgvector + full-text search). A minimal React UI provides hybrid search over everything saved.
 
 **Goal:** prove the idea quickly. Keep it simple. Enhancements come later.
 
@@ -19,7 +19,7 @@ A personal, local-only research assistant. A Chrome extension captures web pages
                          (vector + tsvector)        (metadata, hash)
                                   └────────────┬────────────┘
                                                ▼
-                                       [TanStack Start UI]
+                                       [React UI]
                                         (hybrid search)
 ```
 
@@ -77,7 +77,7 @@ volumes:
 
 ## Components
 
-### 1. Frontend — TanStack Start
+### 1. Frontend — React
 
 - File-based routing, no authentication
 - **Pages:**
@@ -286,7 +286,7 @@ API_BASE_URL=http://localhost:3001
 │       ├── ingest.ts
 │       ├── search.ts
 │       └── db.ts
-├── web/                  # TanStack Start
+├── web/                  # React
 │   ├── Dockerfile
 │   └── src/
 │       └── routes/

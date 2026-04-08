@@ -21,6 +21,11 @@ function saveToHistory(q: string) {
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
+interface Collection {
+  id: string;
+  name: string;
+}
+
 interface SearchResult {
   chunkId: string;
   text: string;
@@ -29,6 +34,7 @@ interface SearchResult {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  collectionId: string;
   savedAt: string;
   score: number;
   matchType: "vector" | "fts" | "both";
@@ -40,6 +46,7 @@ interface DocumentResult {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  collectionId: string;
   savedAt: string;
   bestChunk: string;
   matchType: "vector" | "fts" | "both";
@@ -61,6 +68,7 @@ function deduplicateByDocument(results: SearchResult[]): DocumentResult[] {
         documentTitle: r.documentTitle,
         summary: r.summary,
         doi: r.doi,
+        collectionId: r.collectionId,
         savedAt: r.savedAt,
         bestChunk: r.text,
         matchType: r.matchType,
@@ -80,9 +88,18 @@ export default function SearchPage() {
   const [history, setHistory] = useState<string[]>(loadHistory);
   const [showHistory, setShowHistory] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
   const formRef = useRef<HTMLDivElement>(null);
 
-  async function runSearch(q: string) {
+  useEffect(() => {
+    fetch(`${API}/api/collections`)
+      .then((r) => r.json())
+      .then((d) => setCollections(d.collections))
+      .catch(() => {});
+  }, []);
+
+  async function runSearch(q: string, collectionFilter = selectedCollections) {
     if (!q.trim()) return;
     setLoading(true);
     setError(null);
@@ -90,7 +107,10 @@ export default function SearchPage() {
     saveToHistory(q);
     setHistory(loadHistory());
     try {
-      const res = await fetch(`${API}/api/search?q=${encodeURIComponent(q)}`);
+      const collectionsParam = collectionFilter.size > 0
+        ? `&collections=${Array.from(collectionFilter).join(",")}`
+        : "";
+      const res = await fetch(`${API}/api/search?q=${encodeURIComponent(q)}${collectionsParam}`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       setResults(deduplicateByDocument(data.results));
@@ -125,6 +145,16 @@ export default function SearchPage() {
     runSearch(query);
   }
 
+  function toggleCollection(id: string) {
+    const next = new Set(selectedCollections);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedCollections(next);
+  }
+
   async function handleDelete(documentId: string) {
     setDeleting((prev) => new Set(prev).add(documentId));
     try {
@@ -151,7 +181,39 @@ export default function SearchPage() {
         <Link to="/saved">Saved pages →</Link>
       </div>
 
-      <div ref={formRef} style={{ position: "relative", marginBottom: "2rem" }}>
+      {collections.length > 0 && (
+        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1.5rem", alignItems: "center" }}>
+          <span style={{ fontSize: "0.8rem", color: "#888", marginRight: "0.2rem" }}>Collections:</span>
+          {collections.map((col) => {
+            const active = selectedCollections.has(col.id);
+            return (
+              <button
+                key={col.id}
+                onClick={() => toggleCollection(col.id)}
+                style={{
+                  padding: "3px 10px", fontSize: "0.8rem", borderRadius: 12,
+                  border: `1px solid ${active ? "#1a73e8" : "#ccc"}`,
+                  background: active ? "#e8f0fe" : "#fff",
+                  color: active ? "#1a73e8" : "#555",
+                  cursor: "pointer", fontWeight: active ? 600 : 400,
+                }}
+              >
+                {col.name}
+              </button>
+            );
+          })}
+          {selectedCollections.size > 0 && (
+            <button
+              onClick={() => setSelectedCollections(new Set())}
+              style={{ padding: "3px 10px", fontSize: "0.8rem", borderRadius: 12, border: "1px solid #ccc", background: "none", color: "#888", cursor: "pointer" }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      <div ref={formRef} style={{ position: "relative", marginBottom: collections.length > 0 ? "1rem" : "2rem" }}>
         <form onSubmit={handleSubmit} style={{ display: "flex", gap: "0.5rem" }}>
           <input
             type="search"
@@ -170,7 +232,7 @@ export default function SearchPage() {
         {showHistory && (
           <ul style={{
             position: "absolute", top: "100%", left: 0,
-            right: "6rem", // align with input right edge (roughly button width)
+            right: "6rem",
             margin: "2px 0 0", padding: 0, listStyle: "none",
             border: "1px solid #d0d0d0", borderRadius: 4,
             background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
@@ -219,6 +281,14 @@ export default function SearchPage() {
               }}>
                 {r.matchType}
               </span>
+              <a
+                href={`/document/${r.documentId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ padding: "2px 10px", fontSize: "0.8rem", background: "none", border: "1px solid #ccc", borderRadius: 4, cursor: "pointer", color: "#333", whiteSpace: "nowrap", textDecoration: "none" }}
+              >
+                View
+              </a>
               <button
                 onClick={() => handleDelete(r.documentId)}
                 disabled={deleting.has(r.documentId)}
@@ -237,6 +307,9 @@ export default function SearchPage() {
           <div style={{ fontSize: "0.75rem", color: "#888", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
             <span>{new Date(r.savedAt).toLocaleDateString()}</span>
             {r.doi && <span>DOI: {r.doi}</span>}
+            {collections.length > 1 && (
+              <span>{collections.find((c) => c.id === r.collectionId)?.name ?? ""}</span>
+            )}
             <a href={r.documentUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: "break-all" }}>
               {r.documentUrl}
             </a>

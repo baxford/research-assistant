@@ -30,6 +30,45 @@
       color: #888;
       margin-bottom: 12px;
     }
+    label.field-label {
+      display: block;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      margin-bottom: 10px;
+    }
+    #new-collection-area {
+      display: none;
+      margin-bottom: 10px;
+    }
+    #new-collection-area input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    #create-collection-btn {
+      width: 100%;
+      padding: 6px 0;
+      background: #555;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 6px;
+    }
+    #create-collection-btn:disabled { background: #aaa; cursor: not-allowed; }
     button {
       width: 100%;
       padding: 8px 0;
@@ -54,12 +93,36 @@
     .success { color: #1a7340; }
     .error { color: #c0392b; }
     .info { color: #888; }
+    #force-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <h1>Researcher</h1>
   <div id="url" class="info">Loading…</div>
   <div id="doi"></div>
+
+  <label class="field-label" for="collection-select">Collection</label>
+  <select id="collection-select" disabled>
+    <option value="">Loading collections…</option>
+  </select>
+
+  <div id="new-collection-area">
+    <input type="text" id="new-collection-name" placeholder="New collection name…" />
+    <button id="create-collection-btn" disabled>Create Collection</button>
+  </div>
+
+  <label id="force-label">
+    <input type="checkbox" id="force-checkbox" />
+    Force re-index (overwrite existing)
+  </label>
   <button id="save-btn" disabled>Save Page</button>
   <div id="status"></div>
   <script src="popup.js"></script>

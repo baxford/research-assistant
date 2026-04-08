@@ -5,9 +5,6 @@ import { handleSearch } from "./search.js";
 import { summarizeDocument } from "./summarize.js";
 import sql from "./db.js";
 
-// Migrate existing databases that predate the summary column
-await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS summary TEXT`;
-
 const app = new Hono();
 
 app.use(
@@ -23,13 +20,53 @@ app.use(
       }
       return null;
     },
-    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
   })
 );
 
 app.post("/api/ingest", handleIngest);
 app.get("/api/search", handleSearch);
+
+// Collections
+app.get("/api/collections", async (c) => {
+  const collections = await sql`
+    SELECT id, name, created_at FROM collections ORDER BY created_at ASC
+  `;
+  return c.json({ collections });
+});
+
+app.post("/api/collections", async (c) => {
+  let body: { name: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+  const name = body.name?.trim();
+  if (!name) return c.json({ error: "name is required" }, 400);
+  const [col] = await sql`
+    INSERT INTO collections (name) VALUES (${name}) RETURNING id, name, created_at
+  `;
+  return c.json({ collection: col }, 201);
+});
+
+app.patch("/api/collections/:id", async (c) => {
+  const { id } = c.req.param();
+  let body: { name: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+  const name = body.name?.trim();
+  if (!name) return c.json({ error: "name is required" }, 400);
+  const result = await sql`
+    UPDATE collections SET name = ${name} WHERE id = ${id} RETURNING id, name, created_at
+  `;
+  if (result.length === 0) return c.json({ error: "Not found" }, 404);
+  return c.json({ collection: result[0] });
+});
 
 app.get("/api/reprocess", async (c) => {
   console.log("Reprocessing summaries");
@@ -44,7 +81,6 @@ app.get("/api/reprocess", async (c) => {
     return c.json({ ok: true, processed: 0, message: "All documents already have summaries" });
   }
 
-  // Fire off all summaries concurrently
   await Promise.all(
     docs.map(async ({ id }) => {
       const chunks = await sql<{ text: string }[]>`
@@ -59,13 +95,38 @@ app.get("/api/reprocess", async (c) => {
 });
 
 app.get("/api/documents", async (c) => {
-  const docs = await sql`
-    SELECT id, url, doi, title, summary, captured_at, updated_at
-    FROM documents
-    ORDER BY updated_at DESC
-    LIMIT 100
-  `;
+  const collectionsParam = c.req.query("collections");
+  const collectionIds = collectionsParam ? collectionsParam.split(",").filter(Boolean) : [];
+
+  const docs = collectionIds.length > 0
+    ? await sql`
+        SELECT id, url, doi, title, summary, captured_at, updated_at, collection_id
+        FROM documents
+        WHERE collection_id = ANY(${sql.array(collectionIds)}::uuid[])
+        ORDER BY updated_at DESC
+        LIMIT 100
+      `
+    : await sql`
+        SELECT id, url, doi, title, summary, captured_at, updated_at, collection_id
+        FROM documents
+        ORDER BY updated_at DESC
+        LIMIT 100
+      `;
+
   return c.json({ documents: docs });
+});
+
+app.get("/api/documents/:id", async (c) => {
+  const { id } = c.req.param();
+  const [doc] = await sql`
+    SELECT id, url, doi, title, summary, captured_at, updated_at, collection_id
+    FROM documents WHERE id = ${id}
+  `;
+  if (!doc) return c.json({ error: "Not found" }, 404);
+  const chunks = await sql`
+    SELECT id, ordinal, text FROM chunks WHERE document_id = ${id} ORDER BY ordinal
+  `;
+  return c.json({ document: doc, chunks });
 });
 
 app.delete("/api/documents/:id", async (c) => {
@@ -76,6 +137,7 @@ app.delete("/api/documents/:id", async (c) => {
 });
 
 app.get("/api/health", (c) => c.json({ ok: true }));
+
 
 const port = Number(process.env.PORT ?? 3001);
 console.log(`API listening on http://0.0.0.0:${port}`);
