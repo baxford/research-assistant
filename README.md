@@ -2,11 +2,21 @@
 
 > **Work in Progress** — a self-hosted personal research assistant for collecting, organising, and searching journal articles and web pages.
 
-## What it is
+## Why?
+
+Research and writing of articles involves searching and reading a lot of journal articles. Some of them are useful, and some of them have information that will be useful later on! I always find myself with a huge number of tabs open and it's often difficult to get back to a specific article with the right information. This research assistant allows you to save documents to your local system which you can later search using a hybrid semantic/full-text search, making it easy to find and filter the articles that are relevant to your current work.
+
+Collections allow you to catalog articles into relevant areas.
+
+## How it works
 
 Researcher lets you save pages you're reading (including paywalled journal articles you're already logged into) and search them later using hybrid **semantic + full-text search**.
 
-A Chrome extension captures the page HTML directly from your browser — no need to fetch by URL, which means institutional logins and paywalled content work fine. The API strips the HTML, uses GPT-4o-mini to produce a structured summary and 3–10 semantic chunks, embeds them with OpenAI's text-embedding-ada-002, and stores everything in PostgreSQL with pgvector. The web frontend lets you search across all saved documents using cosine similarity over embeddings combined with full-text search (Reciprocal Rank Fusion).
+A Chrome extension captures the page HTML directly from your browser — no need to fetch by URL, which means institutional logins and paywalled content work fine. 
+
+The API sanitises the HTML, uses GPT-4o-mini (configurable) to produce a structured summary and multiple semantic chunks, embeds them with OpenAI's text-embedding-3-small, and stores everything in PostgreSQL with pgvector. 
+
+The web frontend lets you search across all saved documents using cosine similarity over embeddings combined with full-text search (Reciprocal Rank Fusion).
 
 Documents are organised into **collections** so you can keep separate topic areas tidy.
 
