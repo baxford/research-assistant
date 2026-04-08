@@ -171,3 +171,18 @@ cd web && bun run dev
 ```
 
 Set `VITE_API_BASE_URL=http://localhost:3001` if needed (this is the default).
+
+
+
+## Screenshots
+
+### Chrome Extension
+
+![Researcher Chrome extension — save page popup](docs/chrome-extension.png)
+
+### Search Page
+
+![Researcher Search Page — save page popup](docs/search-results.png)
+
+
+
