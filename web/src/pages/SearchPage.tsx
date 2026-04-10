@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import Nav from "../components/Nav";
 
 const HISTORY_KEY = "researcher_search_history";
 const MAX_HISTORY = 20;
@@ -34,6 +35,8 @@ interface SearchResult {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  authors: string | null;
+  publishedAt: string | null;
   collectionId: string;
   savedAt: string;
   score: number;
@@ -46,6 +49,8 @@ interface DocumentResult {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  authors: string | null;
+  publishedAt: string | null;
   collectionId: string;
   savedAt: string;
   bestChunk: string;
@@ -68,6 +73,8 @@ function deduplicateByDocument(results: SearchResult[]): DocumentResult[] {
         documentTitle: r.documentTitle,
         summary: r.summary,
         doi: r.doi,
+        authors: r.authors,
+        publishedAt: r.publishedAt,
         collectionId: r.collectionId,
         savedAt: r.savedAt,
         bestChunk: r.text,
@@ -178,7 +185,7 @@ export default function SearchPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <h1 style={{ margin: 0 }}>Researcher</h1>
-        <Link to="/saved">Saved pages →</Link>
+        <Nav />
       </div>
 
       {collections.length > 0 && (
@@ -305,7 +312,8 @@ export default function SearchPage() {
           )}
           <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", lineHeight: 1.5, color: "#333" }}>{r.bestChunk}</p>
           <div style={{ fontSize: "0.75rem", color: "#888", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            <span>{new Date(r.savedAt).toLocaleDateString()}</span>
+            {r.authors && <span>Authors: {r.authors}</span>}
+            {r.publishedAt && <span>Published: {new Date(r.publishedAt).toLocaleDateString()}</span>}
             {r.doi && <span>DOI: {r.doi}</span>}
             {collections.length > 1 && (
               <span>{collections.find((c) => c.id === r.collectionId)?.name ?? ""}</span>
@@ -313,6 +321,7 @@ export default function SearchPage() {
             <a href={r.documentUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: "break-all" }}>
               {r.documentUrl}
             </a>
+            <span>Saved: {new Date(r.savedAt).toLocaleDateString()}</span>
           </div>
         </article>
       ))}

@@ -17,6 +17,12 @@ const SummaryAndChunks = z.object({
   reasoning: z
     .string().array()
     .describe("A brief explanation of the reasoning process used to generate the summary and chunks"),
+  published_at: z
+    .string()
+    .describe("The publication date of the article in ISO 8601 format (YYYY-MM-DD or YYYY-MM or YYYY). Look for dates in meta tags, bylines, article headers, or other date indicators. Leave undefined if no publication date can be found."),
+  authors: z
+    .string()
+    .describe("A comma-separated list of the article's authors as they appear in the document (e.g. 'Jane Smith, John Doe'). Look in bylines, author meta tags (citation_author, DC.creator, author), or article headers. Leave empty string if no authors can be found."),
 });
 
 type SummaryAndChunks = z.infer<typeof SummaryAndChunks>;
@@ -62,6 +68,18 @@ Task 3: Reasoning
 Rules for reasoning:
  - The first array element should be a very brief explanation of the reasoning process used to generate the summary.
  - For each chunk, return a name for the chunk and a very brief explanation of the reasoning used to generate the chunk.
+
+Task 4: Publication Date
+- Determine the publication date of the article if available.
+- Look in meta tags (e.g. article:published_time, datePublished, DC.date, citation_publication_date), bylines, article headers, or any visible date near the title.
+- Return the date in ISO 8601 format: YYYY-MM-DD if the full date is known, YYYY-MM if only month/year, or YYYY if only the year.
+- If no publication date can be found, omit the field entirely.
+
+Task 5: Authors
+- Extract the authors of the article if available.
+- Look in bylines, author meta tags (citation_author, DC.creator, article:author), or article headers.
+- Return a comma-separated string of author names as they appear in the document (e.g. "Jane Smith, John Doe").
+- If no authors can be found, return an empty string.
 `,
       },
       { role: "user", content: text },
@@ -73,7 +91,7 @@ Rules for reasoning:
   const usage = res.usage;
   console.log({usage});
   if (!parsed) {
-    return { summary: "", chunks: [], reasoning: [] };
+    return { summary: "", chunks: [], reasoning: [], published_at: "", authors: "" };
   }
   console.log(parsed.reasoning);
   console.log(parsed.chunks);
@@ -85,9 +103,14 @@ export async function summarizeDocument(
   text: string
 ): Promise<string[]> {
   try {
-    const { summary, chunks } = await generateSummaryAndChunks(text);
-    console.log({SUMMARY: summary.length, CHUNKS: chunks.length});
-    await sql`UPDATE documents SET summary = ${summary} WHERE id = ${documentId}`;
+    const { summary, chunks, published_at, authors } = await generateSummaryAndChunks(text);
+    console.log({SUMMARY: summary.length, CHUNKS: chunks.length, published_at, authors});
+    const publishedAt = published_at ? new Date(published_at) : null;
+    await sql`
+      UPDATE documents
+      SET summary = ${summary}, published_at = ${publishedAt}, authors = ${authors || null}
+      WHERE id = ${documentId}
+    `;
     return chunks;
   } catch (err) {
     console.error(`Failed to summarize document ${documentId}:`, err);

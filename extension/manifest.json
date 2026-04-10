@@ -5,7 +5,7 @@
   "description": "Save web pages to your local research assistant",
   "permissions": ["activeTab", "scripting"],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "dist/popup.html",
     "default_title": "Save to Researcher"
   },
   "content_scripts": [],

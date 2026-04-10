@@ -46,6 +46,16 @@ async function resolveCollectionId(collectionId?: string): Promise<string> {
   return col.id;
 }
 
+async function linkSections(documentId: string, sectionIds: string[]) {
+  for (const sectionId of sectionIds) {
+    await sql`
+      INSERT INTO section_documents (section_id, document_id)
+      VALUES (${sectionId}, ${documentId})
+      ON CONFLICT DO NOTHING
+    `;
+  }
+}
+
 export async function handleIngest(c: Context) {
   let body: {
     url: string;
@@ -55,6 +65,7 @@ export async function handleIngest(c: Context) {
     html: string;
     force?: boolean;
     collection_id?: string;
+    section_ids?: string[];
   };
 
   try {
@@ -63,74 +74,75 @@ export async function handleIngest(c: Context) {
     return c.json({ ok: false, error: "Invalid JSON body" }, 400);
   }
 
-  const { url, title, doi, capturedAt, html, force, collection_id } = body;
+  const { url, title, doi, capturedAt, html, force, collection_id, section_ids } = body;
   if (!url || !html) {
     return c.json({ ok: false, error: "url and html are required" }, 400);
   }
 
-  
   const plainText = stripHtml(html);
   const hash = await sha256(plainText);
-  
-  console.log({INDEXING: url, doi, length: plainText.length});
+
+  console.log({ INDEXING: url, doi, length: plainText.length });
 
   // Find existing document by DOI (preferred) or URL
   const existing = doi
     ? await sql`SELECT id, content_hash FROM documents WHERE doi = ${doi} LIMIT 1`
     : await sql`SELECT id, content_hash FROM documents WHERE url = ${url} LIMIT 1`;
 
-  if (!force && existing.length > 0 && existing[0].content_hash === hash) {
-    console.log({SKIPPING: url, doi, reason: "content unchanged"});
-    return c.json({ ok: true, status: "skipped", reason: "content unchanged" });
-  }
-
-  const capturedAtTs = capturedAt ? new Date(capturedAt) : new Date();
-  const resolvedCollectionId = await resolveCollectionId(collection_id);
+  const isSkipped = !force && existing.length > 0 && existing[0].content_hash === hash;
 
   let documentId: string;
-  if (existing.length > 0) {
-    // Update existing
+  let chunks = 0;
+
+  if (isSkipped) {
     documentId = existing[0].id;
-    await sql`
-      UPDATE documents
-      SET url = ${url}, title = ${title ?? null}, content_hash = ${hash},
-          collection_id = ${resolvedCollectionId}, updated_at = now()
-      WHERE id = ${documentId}
-    `;
-    await sql`DELETE FROM chunks WHERE document_id = ${documentId}`;
+    console.log({ SKIPPING: url, doi, reason: "content unchanged" });
   } else {
-    // Insert new
-    const [doc] = await sql`
-      INSERT INTO documents (url, doi, title, content_hash, captured_at, collection_id)
-      VALUES (${url}, ${doi ?? null}, ${title ?? null}, ${hash}, ${capturedAtTs}, ${resolvedCollectionId})
-      RETURNING id
-    `;
-    documentId = doc.id;
+    const capturedAtTs = capturedAt ? new Date(capturedAt) : new Date();
+    const resolvedCollectionId = await resolveCollectionId(collection_id);
+
+    if (existing.length > 0) {
+      documentId = existing[0].id;
+      await sql`
+        UPDATE documents
+        SET url = ${url}, title = ${title ?? null}, content_hash = ${hash},
+            collection_id = ${resolvedCollectionId}, updated_at = now()
+        WHERE id = ${documentId}
+      `;
+      await sql`DELETE FROM chunks WHERE document_id = ${documentId}`;
+    } else {
+      const [doc] = await sql`
+        INSERT INTO documents (url, doi, title, content_hash, captured_at, collection_id)
+        VALUES (${url}, ${doi ?? null}, ${title ?? null}, ${hash}, ${capturedAtTs}, ${resolvedCollectionId})
+        RETURNING id
+      `;
+      documentId = doc.id;
+    }
+
+    const textChunks = await summarizeDocument(documentId, plainText);
+
+    if (textChunks.length > 0) {
+      console.log({ GENERATING_EMBEDDINGS: url, doi, chunks: textChunks.length });
+      const embeddings = await embedTexts(textChunks);
+      for (let i = 0; i < textChunks.length; i++) {
+        await sql`
+          INSERT INTO chunks (document_id, ordinal, text, embedding)
+          VALUES (${documentId}, ${i}, ${textChunks[i]}, ${JSON.stringify(embeddings[i])}::vector)
+        `;
+      }
+      chunks = textChunks.length;
+    }
   }
 
-  const textChunks = await summarizeDocument(documentId, plainText);
-  if (textChunks.length === 0) {
-    console.log({SKIPPING: url, doi, reason: "no chunks generated"});
-    return c.json({ ok: true, status: "ingested", chunks: 0 });
+  // Link to sections — always applied, even on skipped (allows adding links without re-indexing)
+  if (section_ids && section_ids.length > 0) {
+    await linkSections(documentId, section_ids);
   }
 
-  console.log({GENERATING_EMBEDDINGS: url, doi, chunks: textChunks.length});
-  
-  const embeddings = await embedTexts(textChunks);
-
-  const rows = textChunks.map((text, i) => ({
-    document_id: documentId,
-    ordinal: i,
-    text,
-    embedding: JSON.stringify(embeddings[i]),
-  }));
-
-  for (const row of rows) {
-    await sql`
-      INSERT INTO chunks (document_id, ordinal, text, embedding)
-      VALUES (${row.document_id}, ${row.ordinal}, ${row.text}, ${row.embedding}::vector)
-    `;
-  }
-
-  return c.json({ ok: true, status: "ingested", chunks: textChunks.length });
+  return c.json({
+    ok: true,
+    status: isSkipped ? "skipped" : "ingested",
+    ...(isSkipped ? { reason: "content unchanged" } : { chunks }),
+    documentId,
+  });
 }

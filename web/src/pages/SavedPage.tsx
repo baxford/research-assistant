@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import Nav from "../components/Nav";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -16,6 +16,8 @@ interface Doc {
   summary: string | null;
   captured_at: string;
   updated_at: string;
+  authors: string | null;
+  published_at: string | null;
   collection_id: string;
 }
 
@@ -83,7 +85,7 @@ export default function SavedPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <h1 style={{ margin: 0 }}>Saved Pages</h1>
-        <Link to="/">← Search</Link>
+        <Nav />
       </div>
 
       {collections.length > 0 && (
@@ -152,12 +154,14 @@ export default function SavedPage() {
             </div>
           )}
           <div style={{ fontSize: "0.75rem", color: "#888", marginTop: "0.25rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            <span>Saved {new Date(doc.captured_at).toLocaleDateString()}</span>
+            {doc.authors && <span>Authors: {doc.authors}</span>}
+            {doc.published_at && <span>Published: {new Date(doc.published_at).toLocaleDateString()}</span>}
             {doc.doi && <span>DOI: {doc.doi}</span>}
             {collections.length > 1 && (
               <span>{collections.find((c) => c.id === doc.collection_id)?.name ?? ""}</span>
             )}
             <span style={{ wordBreak: "break-all" }}>{doc.url}</span>
+            <span>Saved: {new Date(doc.captured_at).toLocaleDateString()}</span>
           </div>
         </article>
       ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Nav from "../components/Nav";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -11,6 +12,8 @@ interface Document {
   summary: string | null;
   captured_at: string;
   updated_at: string;
+  authors: string | null;
+  published_at: string | null;
 }
 
 interface Chunk {
@@ -76,7 +79,8 @@ export default function DocumentPage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+        <Nav />
         <button
           onClick={handleDelete}
           disabled={deleting}
@@ -98,14 +102,13 @@ export default function DocumentPage() {
           </div>
         )}
         <div style={{ fontSize: "0.75rem", color: "#888", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <span>Saved {new Date(doc.captured_at).toLocaleDateString()}</span>
-          {doc.captured_at !== doc.updated_at && (
-            <span>Updated {new Date(doc.updated_at).toLocaleDateString()}</span>
-          )}
+          {doc.authors && <span>Authors: {doc.authors}</span>}
+          {doc.published_at && <span>Published: {new Date(doc.published_at).toLocaleDateString()}</span>}
           {doc.doi && <span>DOI: {doc.doi}</span>}
           <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: "break-all" }}>
             {doc.url}
           </a>
+          <span>Saved: {new Date(doc.updated_at).toLocaleDateString()}</span>
         </div>
       </article>
 

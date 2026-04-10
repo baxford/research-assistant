@@ -14,6 +14,8 @@ interface SearchHit {
   documentTitle: string | null;
   summary: string | null;
   doi: string | null;
+  authors: string | null;
+  publishedAt: string | null;
   collectionId: string;
   savedAt: string;
   score: number;
@@ -41,12 +43,12 @@ export async function handleSearch(c: Context) {
   });
   const queryVec = JSON.stringify(embRes.data[0].embedding);
 
-  type Row = { id: string; text: string; doc_id: string; url: string; title: string | null; summary: string | null; doi: string | null; collection_id: string; captured_at: Date };
+  type Row = { id: string; text: string; doc_id: string; url: string; title: string | null; summary: string | null; doi: string | null; authors: string | null; published_at: Date | null; collection_id: string; captured_at: Date };
 
   // Vector search
   const vectorRows = hasCollectionFilter
     ? await sql<Row[]>`
-        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.authors, d.published_at, d.collection_id, d.captured_at
         FROM chunks c
         JOIN documents d ON d.id = c.document_id
         WHERE d.collection_id = ANY(${sql.array(collectionIds)}::uuid[])
@@ -54,7 +56,7 @@ export async function handleSearch(c: Context) {
         LIMIT ${TOP_K}
       `
     : await sql<Row[]>`
-        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.authors, d.published_at, d.collection_id, d.captured_at
         FROM chunks c
         JOIN documents d ON d.id = c.document_id
         ORDER BY c.embedding <=> ${queryVec}::vector
@@ -64,7 +66,7 @@ export async function handleSearch(c: Context) {
   // FTS search
   const ftsRows = hasCollectionFilter
     ? await sql<Row[]>`
-        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.authors, d.published_at, d.collection_id, d.captured_at
         FROM chunks c
         JOIN documents d ON d.id = c.document_id
         WHERE c.tsv @@ websearch_to_tsquery('english', ${q})
@@ -73,7 +75,7 @@ export async function handleSearch(c: Context) {
         LIMIT ${TOP_K}
       `
     : await sql<Row[]>`
-        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.collection_id, d.captured_at
+        SELECT c.id, c.text, d.id AS doc_id, d.url, d.title, d.summary, d.doi, d.authors, d.published_at, d.collection_id, d.captured_at
         FROM chunks c
         JOIN documents d ON d.id = c.document_id
         WHERE c.tsv @@ websearch_to_tsquery('english', ${q})
@@ -109,6 +111,8 @@ export async function handleSearch(c: Context) {
       documentTitle: row.title,
       summary: row.summary,
       doi: row.doi,
+      authors: row.authors,
+      publishedAt: row.published_at ? row.published_at.toISOString() : null,
       collectionId: row.collection_id,
       savedAt: row.captured_at.toISOString(),
       score: Math.round(score * 10000) / 10000,
