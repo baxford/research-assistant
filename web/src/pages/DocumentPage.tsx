@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Nav from "../components/Nav";
+import Layout from "../components/Layout";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -78,9 +78,8 @@ export default function DocumentPage() {
   );
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <Nav />
+    <Layout
+      actions={
         <button
           onClick={handleDelete}
           disabled={deleting}
@@ -88,7 +87,8 @@ export default function DocumentPage() {
         >
           {deleting ? "Deleting…" : "Delete"}
         </button>
-      </div>
+      }
+    >
 
       <article style={{ marginBottom: "1.5rem", padding: "1rem 1.25rem", border: "1px solid #e0e0e0", borderRadius: 6 }}>
         <h2 style={{ margin: "0 0 0.5rem" }}>
@@ -129,6 +129,6 @@ export default function DocumentPage() {
           {chunk.text}
         </div>
       ))}
-    </>
+    </Layout>
   );
 }

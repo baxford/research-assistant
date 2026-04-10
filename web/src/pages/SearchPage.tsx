@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import Nav from "../components/Nav";
+import Layout from "../components/Layout";
 
 const HISTORY_KEY = "researcher_search_history";
 const MAX_HISTORY = 20;
@@ -182,11 +182,7 @@ export default function SearchPage() {
   }
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Researcher</h1>
-        <Nav />
-      </div>
+    <Layout>
 
       {collections.length > 0 && (
         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1.5rem", alignItems: "center" }}>
@@ -329,6 +325,6 @@ export default function SearchPage() {
       {!searched && !error && (
         <p style={{ color: "#999", marginTop: "2rem" }}>Save pages with the Chrome extension, then search here.</p>
       )}
-    </>
+    </Layout>
   );
 }

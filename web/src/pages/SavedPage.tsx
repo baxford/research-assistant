@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import Nav from "../components/Nav";
+import Layout from "../components/Layout";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -82,11 +82,7 @@ export default function SavedPage() {
   }
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Saved Pages</h1>
-        <Nav />
-      </div>
+    <Layout>
 
       {collections.length > 0 && (
         <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1.5rem", alignItems: "center" }}>
@@ -165,6 +161,6 @@ export default function SavedPage() {
           </div>
         </article>
       ))}
-    </>
+    </Layout>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import Nav from "../components/Nav";
+import Layout from "../components/Layout";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
@@ -370,16 +370,22 @@ export default function SectionsPage() {
   const roots = childrenOf(null);
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", background: "#fff", zIndex: 1 }}>
+    <Layout>
+      <div style={{ display: "flex", background: "#fff", minHeight: "calc(100vh - 4rem)" }}>
 
-      {/* ── Explorer panel ── */}
-      <div style={{ width: 260, flexShrink: 0, borderRight: "1px solid #e0e0e0", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+        {/* ── Explorer panel ── */}
+        <div style={{ width: 260, flexShrink: 0, borderRight: "1px solid #e0e0e0", display: "flex", flexDirection: "column", background: "#fafafa" }}>
 
-        {/* Header */}
-        <div style={{ padding: "0.65rem 1rem", borderBottom: "1px solid #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "#333" }}>Projects</span>
-          <Nav />
-        </div>
+          {/* Header */}
+          <div style={{ padding: "0.65rem 1rem", borderBottom: "1px solid #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "#333" }}>Project Tree</span>
+            <button
+              onClick={() => handleCreate(null)}
+              style={{ padding: "2px 8px", fontSize: "0.75rem", background: "none", border: "1px dashed #ccc", borderRadius: 3, cursor: "pointer", color: "#888" }}
+            >
+              + Add
+            </button>
+          </div>
 
         {/* Tree */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0.4rem 0" }}>
@@ -388,16 +394,6 @@ export default function SectionsPage() {
             <p style={{ padding: "0.5rem 1rem", fontSize: "0.8rem", color: "#aaa", margin: 0 }}>No projects yet.</p>
           )}
           {roots.map((s) => renderNode(s, 0))}
-        </div>
-
-        {/* Add root section */}
-        <div style={{ padding: "0.5rem", borderTop: "1px solid #e0e0e0", flexShrink: 0 }}>
-          <button
-            onClick={() => handleCreate(null)}
-            style={{ width: "100%", padding: "5px", fontSize: "0.8rem", background: "none", border: "1px dashed #ccc", borderRadius: 4, cursor: "pointer", color: "#888" }}
-          >
-            + Add project
-          </button>
         </div>
       </div>
 
@@ -417,6 +413,7 @@ export default function SectionsPage() {
         )}
         {sections.map(renderDocSection)}
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
